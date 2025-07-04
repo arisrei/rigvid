@@ -2,9 +2,9 @@
 
 [[Project Page]](https://rigvid-robot.github.io/)  [[Paper]]()  [[Video]]()
 
-**Authors:** Shivansh Patel<sup>1</sup>, Shraddhaa Mohan<sup>1</sup>, Hanlin Mai<sup>1</sup>, Unnat Jain<sup>2,3*</sup>, Svetlana Lazebnik<sup>1*</sup>, Yunzhu Li<sup>4*</sup> (* denotes equal advising)
+**Authors:** Shivansh Patel<sup>1</sup>, Shraddhaa Mohan<sup>1</sup>, Hanlin Mai<sup>1</sup>, Unnat Jain<sup>2*</sup>, Svetlana Lazebnik<sup>1*</sup>, Yunzhu Li<sup>3*</sup> (* denotes equal advising)
 
-<sup>1</sup> University of Illinois Urbana-Champaign • <sup>2</sup> UC Irvine • <sup>3</sup> Skild AI • <sup>4</sup> Columbia University
+<sup>1</sup> University of Illinois Urbana-Champaign • <sup>2</sup> UC Irvine <sup>3</sup> Columbia University
 
 
 <figure>
