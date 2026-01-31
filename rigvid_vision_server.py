@@ -33,24 +33,22 @@ sys.path.insert(0, SCRIPT_DIR)
 
 app = FastAPI(title="RigVid Vision API", version="1.0.0")
 
-# Global model instances (lazy loaded)
-_depth_predictor = None
-_pose_predictor_cache = {}
 
+def create_depth_predictor():
+    """Create a fresh RollingDepth predictor instance.
 
-def get_depth_predictor():
-    """Lazy load RollingDepth predictor."""
-    global _depth_predictor
-    if _depth_predictor is None:
-        logger.info("Loading RollingDepth model...")
-        from depth_predictor import DepthPredictor
-        _depth_predictor = DepthPredictor(
-            checkpoint="prs-eth/rollingdepth-v1-0",
-            dtype="fp16",
-            color_maps=["Greys_r"],
-        )
-        logger.info("RollingDepth loaded successfully")
-    return _depth_predictor
+    We create a new instance each time to avoid state accumulation issues
+    that can cause device mismatches on subsequent calls.
+    """
+    logger.info("Loading RollingDepth model...")
+    from depth_predictor import DepthPredictor
+    predictor = DepthPredictor(
+        checkpoint="prs-eth/rollingdepth-v1-0",
+        dtype="fp16",
+        color_maps=["Greys_r"],
+    )
+    logger.info("RollingDepth loaded successfully")
+    return predictor
 
 
 # ============== Request/Response Models ==============
@@ -143,7 +141,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         models_loaded={
-            "depth_predictor": _depth_predictor is not None,
+            "depth_predictor": True,  # Always available (loaded fresh each time)
         }
     )
 
@@ -159,8 +157,8 @@ async def run_depth_prediction(request: DepthPredictionRequest):
             video_path = os.path.join(tmpdir, "input.mp4")
             b64_to_file(request.video_b64, video_path)
             
-            # Run depth prediction
-            predictor = get_depth_predictor()
+            # Run depth prediction (create fresh instance each time to avoid state issues)
+            predictor = create_depth_predictor()
             depth_npy = predictor.predict(
                 input_video_path=video_path,
                 output_dir=tmpdir,
