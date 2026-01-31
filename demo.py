@@ -126,7 +126,7 @@ def main():
     )
     vis.plot()
     vis.save_html(f"{args.output_dir}/trajectory_visualization.html")
-    vis.show()
+    # vis.show()
 
 
 if __name__ == "__main__":

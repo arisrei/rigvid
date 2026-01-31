@@ -171,7 +171,8 @@ class PoseRolloutPredictor:
                         self.debug_dir, "track_vis", f"{self.reader.id_strs[i]}.png"
                     )
                     imageio.imwrite(out_path, vis)
-                if self.debug >= 1:
+                if self.debug >= 3:
+                    # Only try to display if debug >= 3 (requires X11 display)
                     cv2.imshow('Track', vis[..., ::-1]); cv2.waitKey(1)
 
         # compile video
