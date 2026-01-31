@@ -36,9 +36,10 @@ def create_video_from_images(image_dir, output_video_path, fps=30):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         frames.append(image_rgb)
 
-    # Write video with imageio using ffmpeg backend
+    # Write video with imageio using ffmpeg backend (explicitly specify format to avoid pyav)
     writer = imageio.get_writer(
         output_video_path,
+        format="FFMPEG",
         fps=fps,
         codec="libx264",
         pixelformat="yuv420p",  # Required for browser compatibility
