@@ -1,0 +1,5 @@
+torch==2.4.1+cu121
+torchvision==0.19.1+cu121
+torchaudio==2.4.1+cu121
+numpy==1.26.4
+scipy==1.12.0

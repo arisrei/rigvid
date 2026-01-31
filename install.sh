@@ -1,39 +1,83 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_NAME="rigvid"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 PYTHON_VER="3.10"
-CUDA_VER="11.8"
 PYTORCH_VER="2.4.1"
+
+# Parse command line arguments
+CONTINUE_VENV=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --continue)
+            CONTINUE_VENV=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --continue    Continue using existing .venv instead of creating a new one"
+            echo "  -h, --help    Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Install system dependencies (eigen3 for FoundationPose)
+echo "Installing system dependencies..."
+sudo apt-get update
+sudo apt-get install -y libeigen3-dev
+
+# Initialize uv project if not already done
+if [ ! -f "pyproject.toml" ]; then
+    echo "Initializing uv project..."
+    uv init --python "${PYTHON_VER}" --no-workspace
+fi
+
+# Create or reuse virtual environment
+if [ "$CONTINUE_VENV" = true ] && [ -d ".venv" ]; then
+    echo "Continuing with existing virtual environment..."
+else
+    echo "Creating virtual environment with Python ${PYTHON_VER}..."
+    uv venv .venv --python "${PYTHON_VER}"
+fi
+
+# Activate the virtual environment for this script
+source .venv/bin/activate
 
 # Clone repositories
 echo "Cloning RollingDepth and FoundationPose repositories..."
-git clone https://github.com/prs-eth/RollingDepth.git
-git clone https://github.com/NVlabs/FoundationPose.git
+git clone https://github.com/prs-eth/RollingDepth.git || true
+git clone https://github.com/NVlabs/FoundationPose.git || true
 
-# Create and activate conda environment
-echo "Creating conda environment '${ENV_NAME}'..."
-conda create -n "${ENV_NAME}" python="${PYTHON_VER}" cudatoolkit="${CUDA_VER}" -y
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "${ENV_NAME}"
+# Install build dependencies first
+echo "Installing build dependencies..."
+uv pip install setuptools wheel pip
 
 # Install numpy and scipy with ABI compatibility
 echo "Installing numpy and scipy..."
-conda install -y -c conda-forge numpy=1.26.4 scipy=1.12.0 PyJWT
+uv pip install numpy==1.26.4 scipy==1.12.0 PyJWT
 
-# Install GPU PyTorch
+# Install GPU PyTorch (CUDA 12.1 for compatibility with system CUDA 12.x)
 echo "Installing PyTorch, torchvision, and torchaudio..."
-pip install \
-  torch=="${PYTORCH_VER}+cu118" \
-  torchvision=="0.19.1+cu118" \
-  torchaudio=="${PYTORCH_VER}+cu118" \
-  --extra-index-url https://download.pytorch.org/whl/cu118
+uv pip install \
+  "torch==${PYTORCH_VER}+cu121" \
+  "torchvision==0.19.1+cu121" \
+  "torchaudio==${PYTORCH_VER}+cu121" \
+  --extra-index-url https://download.pytorch.org/whl/cu121
 
 # Create constraints file
 cat > constraints.txt <<EOF
-torch==${PYTORCH_VER}+cu118
-torchvision==0.19.1+cu118
-torchaudio==${PYTORCH_VER}+cu118
+torch==${PYTORCH_VER}+cu121
+torchvision==0.19.1+cu121
+torchaudio==${PYTORCH_VER}+cu121
 numpy==1.26.4
 scipy==1.12.0
 EOF
@@ -41,7 +85,7 @@ EOF
 # Install RollingDepth dependencies and diffusers development version
 echo "Installing RollingDepth dependencies..."
 pushd RollingDepth >/dev/null
-pip install -r requirements.txt -c ../constraints.txt
+uv pip install -r requirements.txt -c ../constraints.txt
 bash script/install_diffusers_dev.sh
 popd >/dev/null
 
@@ -50,21 +94,28 @@ export PYTHONPATH="$(pwd)/RollingDepth:${PYTHONPATH:-}"
 
 # Install FoundationPose dependencies
 echo "Installing FoundationPose dependencies..."
-conda install -y -c conda-forge eigen=3.4.0
 
 pushd FoundationPose >/dev/null
 
 # Adjust FoundationPose requirements to avoid conflicts
 sed -i '/^torch==.*+cu118/d; /^torchvision==.*+cu118/d; /^torchaudio==.*+cu118/d' requirements.txt
-pip install -r requirements.txt -c ../constraints.txt
+uv pip install -r requirements.txt -c ../constraints.txt
 
 # Additional FoundationPose dependencies
-pip install --quiet --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git
-pip install fvcore iopath ninja
-pip install git+https://github.com/facebookresearch/pytorch3d.git
+# Use venv's pip directly for packages that require PyTorch during build
+# (uv pip's --no-build-isolation doesn't work the same way)
+# Set TORCH_CUDA_ARCH_LIST to bypass strict CUDA version check during build
+export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0"
+../.venv/bin/pip install --no-build-isolation --no-cache-dir git+https://github.com/NVlabs/nvdiffrast.git
+uv pip install fvcore iopath ninja
+# Try pre-built wheel first, fall back to source build if not available
+# Check https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/ for available wheels
+uv pip install pytorch3d --index-url https://dl.fbaipublicfiles.com/pytorch3d/whl/cu121/torch2.4.0/pyt240 --no-deps 2>/dev/null || \
+  ../.venv/bin/pip install --no-build-isolation git+https://github.com/facebookresearch/pytorch3d.git
 
 # Set CMAKE prefix path for pybind11
-export CMAKE_PREFIX_PATH="$CONDA_PREFIX/lib/python${PYTHON_VER}/site-packages/pybind11/share/cmake/pybind11:${CMAKE_PREFIX_PATH:-}"
+PYTHON_SITE_PACKAGES=$(.venv/bin/python -c "import site; print(site.getsitepackages()[0])" 2>/dev/null || python -c "import site; print(site.getsitepackages()[0])")
+export CMAKE_PREFIX_PATH="${PYTHON_SITE_PACKAGES}/pybind11/share/cmake/pybind11:${CMAKE_PREFIX_PATH:-}"
 
 # Configure setup.py for FoundationPose CUDA extensions
 SETUP_PY="bundlesdf/mycuda/setup.py"
@@ -112,8 +163,14 @@ bash build_all_conda.sh
 popd >/dev/null
 
 # Completion message
-echo "Setup complete. Activate the environment with:"
-echo "  conda activate ${ENV_NAME}"
-echo "Then run the projects with:"
+echo ""
+echo "=========================================="
+echo "Setup complete!"
+echo "=========================================="
+echo ""
+echo "To activate the environment:"
+echo "  source .venv/bin/activate"
+echo ""
+echo "Run the projects with:"
 echo "  RollingDepth: python run_video.py"
 echo "  FoundationPose: cd FoundationPose && python run_demo.py"

@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 from depth_predictor import DepthPredictor
 from pose_rollout_predictor import PoseRolloutPredictor
@@ -69,7 +70,7 @@ def main():
 
     args = parser.parse_args()
 
-    original_path = args.input_video
+    original_path = Path(args.input_video)
     rescaled_path = f"{args.output_dir}/{original_path.stem}_rescaled.mp4"
 
     print(f"Rescaling video to: {rescaled_path}")
@@ -87,11 +88,10 @@ def main():
         dtype=args.dtype,
         color_maps=args.color_maps,
     )
-    # depth_npy = predictor.predict(
-    #     input_video_path=str(rescaled_path),
-    #     output_dir=args.output_dir,
-    # )
-    depth_npy = np.load("outputs/generated_video_rescaled_pred.npy")
+    depth_npy = predictor.predict(
+        input_video_path=str(rescaled_path),
+        output_dir=args.output_dir,
+    )
 
     print("Prepare FP inputs...")
     prepare_fp_inputs(
@@ -107,15 +107,15 @@ def main():
     )
 
     print("Pose rollout prediction...")
-    # pose_rollout_predictor = PoseRolloutPredictor(
-    #     data_path=args.output_dir,
-    #     mesh_file="media/mesh/mesh.obj",
-    #     est_refine_iter=10,
-    #     track_refine_iter=4,
-    #     debug=0,
-    #     debug_dir="outputs/fp_outputs",
-    # )
-    # pose_rollout_predictor.run()
+    pose_rollout_predictor = PoseRolloutPredictor(
+        data_path=args.output_dir,
+        mesh_file="media/mesh/mesh.obj",
+        est_refine_iter=10,
+        track_refine_iter=4,
+        debug=2,
+        debug_dir="outputs/fp_outputs",
+    )
+    pose_rollout_predictor.run()
 
     vis = PoseTrajectoryVisualizer(
         pose_dir=f"{args.output_dir}/fp_outputs/ob_in_cam",
