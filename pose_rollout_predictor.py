@@ -27,21 +27,17 @@ def create_video_from_images(image_dir, output_video_path, fps=30):
         print("No images found in the directory.")
         return
 
-    # Read the first image to get video dimensions
-    first_image = cv2.imread(image_files[0])
-    height, width, _ = first_image.shape
+    import imageio.v3 as iio
 
-    # Define the codec and create VideoWriter object
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # Use 'mp4v' for .mp4 output
-    video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-
-    # Write each image to the video
+    # Read all images and convert BGR to RGB
+    frames = []
     for img_path in image_files:
         image = cv2.imread(img_path)
-        video_writer.write(image)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        frames.append(image_rgb)
 
-    # Release the video writer
-    video_writer.release()
+    # Write video with imageio (uses ffmpeg backend, produces browser-compatible H.264)
+    iio.imwrite(output_video_path, frames, fps=fps)
     print(f"Video saved at {output_video_path}")
 
 
