@@ -27,8 +27,7 @@ def create_video_from_images(image_dir, output_video_path, fps=30):
         print("No images found in the directory.")
         return
 
-    import imageio.v3 as iio
-    import numpy as np
+    import imageio
 
     # Read all images and convert BGR to RGB
     frames = []
@@ -37,17 +36,16 @@ def create_video_from_images(image_dir, output_video_path, fps=30):
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         frames.append(image_rgb)
 
-    # Stack frames into array for imageio
-    frames_array = np.stack(frames, axis=0)
-
-    # Write video with imageio using pyav plugin with explicit codec
-    iio.imwrite(
+    # Write video with imageio using ffmpeg backend
+    writer = imageio.get_writer(
         output_video_path,
-        frames_array,
         fps=fps,
         codec="libx264",
-        plugin="pyav",
+        pixelformat="yuv420p",  # Required for browser compatibility
     )
+    for frame in frames:
+        writer.append_data(frame)
+    writer.close()
     print(f"Video saved at {output_video_path}")
 
 
