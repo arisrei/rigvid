@@ -56,7 +56,9 @@ def find_scale_and_shift(
 
     n_total = len(dp_vals)
     if mask_invalid:
-        valid = (dp_vals > 0) & (dg_vals > 0)
+        # Only filter based on ground truth depth being valid (> 0)
+        # RollingDepth outputs normalized depth which can be negative, so we don't filter pred values
+        valid = dg_vals > 0
         dp_vals = dp_vals[valid]
         dg_vals = dg_vals[valid]
 
@@ -64,8 +66,8 @@ def find_scale_and_shift(
     if len(dp_vals) < 2:
         raise ValueError(
             f"Not enough valid points for depth calibration. "
-            f"Had {n_total} pixel coords, but only {len(dp_vals)} have valid depth in both pred and gt. "
-            f"This likely means the mask region has no valid depth values."
+            f"Had {n_total} pixel coords, but only {len(dp_vals)} have valid ground truth depth. "
+            f"This likely means the mask region has no valid depth values in the ground truth."
         )
 
     # solve [dp_vals, 1] * [alpha; beta] = dg_vals

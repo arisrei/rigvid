@@ -194,10 +194,8 @@ async def run_depth_prediction(request: DepthPredictionRequest):
                     pred0_resized = cv2.resize(depth_npy[0].astype(np.float32), (gt_depth.shape[1], gt_depth.shape[0]), interpolation=cv2.INTER_CUBIC)
                     pred_vals = pred0_resized[pixel_coords[:,0], pixel_coords[:,1]]
                     gt_vals = gt_depth[pixel_coords[:,0], pixel_coords[:,1]].astype(np.float32)
-                    logger.info(f"  - pred values at coords: min={pred_vals.min():.4f}, max={pred_vals.max():.4f}, non-zero={np.sum(pred_vals > 0)}")
-                    logger.info(f"  - gt values at coords: min={gt_vals.min():.4f}, max={gt_vals.max():.4f}, non-zero={np.sum(gt_vals > 0)}")
-                    valid_mask = (pred_vals > 0) & (gt_vals > 0)
-                    logger.info(f"  - valid (both > 0): {np.sum(valid_mask)} points")
+                    logger.info(f"  - pred values at coords: min={pred_vals.min():.4f}, max={pred_vals.max():.4f} (RollingDepth uses normalized range, can be negative)")
+                    logger.info(f"  - gt values at coords: min={gt_vals.min():.4f}, max={gt_vals.max():.4f}, valid (>0)={np.sum(gt_vals > 0)}")
 
                 alpha, beta = find_scale_and_shift(depth_npy, gt_depth, pixel_coords, mask_invalid=True)
                 logger.info(f"  - calibration result: alpha={alpha:.6f}, beta={beta:.6f}")
