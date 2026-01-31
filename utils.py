@@ -35,7 +35,12 @@ def find_scale_and_shift(
     """
     Estimate alpha, beta s.t. alpha * depth_pred + beta ≈ depth_gt
     using only the pixels specified by pixel_coords (row,col).
+
+    Raises ValueError if calibration fails.
     """
+    if len(pixel_coords) == 0:
+        raise ValueError("No pixel coordinates provided for depth calibration. Check that the mask is valid.")
+
     # resize first frame of prediction to match ground‐truth resolution
     pred0 = cv2.resize(
         depth_pred[0].astype(np.float32),
@@ -49,15 +54,31 @@ def find_scale_and_shift(
     dp_vals = pred0[rows, cols]
     dg_vals = depth_gt[rows, cols].astype(np.float32)
 
+    n_total = len(dp_vals)
     if mask_invalid:
         valid = (dp_vals > 0) & (dg_vals > 0)
         dp_vals = dp_vals[valid]
         dg_vals = dg_vals[valid]
 
+    # Check if we have enough valid points
+    if len(dp_vals) < 2:
+        raise ValueError(
+            f"Not enough valid points for depth calibration. "
+            f"Had {n_total} pixel coords, but only {len(dp_vals)} have valid depth in both pred and gt. "
+            f"This likely means the mask region has no valid depth values."
+        )
+
     # solve [dp_vals, 1] * [alpha; beta] = dg_vals
     A = np.stack([dp_vals, np.ones_like(dp_vals)], axis=-1)
     coefs, *_ = np.linalg.lstsq(A, dg_vals, rcond=None)
     alpha, beta = float(coefs[0]), float(coefs[1])
+
+    # Sanity check - if calibration gives bad values, raise
+    if not np.isfinite(alpha) or not np.isfinite(beta):
+        raise ValueError(f"Depth calibration produced invalid values: alpha={alpha}, beta={beta}")
+    if alpha <= 0:
+        raise ValueError(f"Depth calibration produced non-positive alpha={alpha}. This suggests the depth maps are incompatible.")
+
     return alpha, beta
 
 

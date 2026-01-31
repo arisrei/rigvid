@@ -178,9 +178,29 @@ async def run_depth_prediction(request: DepthPredictionRequest):
                 # Load ground truth depth
                 gt_depth = b64_to_image(request.gt_depth_b64)
 
+                logger.info(f"Depth calibration debug:")
+                logger.info(f"  - depth_npy shape: {depth_npy.shape}, dtype: {depth_npy.dtype}")
+                logger.info(f"  - depth_npy[0] min/max: {depth_npy[0].min():.4f} / {depth_npy[0].max():.4f}")
+                logger.info(f"  - gt_depth shape: {gt_depth.shape}, dtype: {gt_depth.dtype}")
+                logger.info(f"  - gt_depth min/max: {gt_depth.min()} / {gt_depth.max()}")
+
                 # Find scale and shift
                 pixel_coords = find_center_of_mask(mask_path, window_size=20)
+                logger.info(f"  - pixel_coords from mask: {len(pixel_coords)} points")
+                if len(pixel_coords) > 0:
+                    logger.info(f"  - pixel_coords range: rows [{pixel_coords[:,0].min()}, {pixel_coords[:,0].max()}], cols [{pixel_coords[:,1].min()}, {pixel_coords[:,1].max()}]")
+
+                    # Check values at these coordinates in both depth maps
+                    pred0_resized = cv2.resize(depth_npy[0].astype(np.float32), (gt_depth.shape[1], gt_depth.shape[0]), interpolation=cv2.INTER_CUBIC)
+                    pred_vals = pred0_resized[pixel_coords[:,0], pixel_coords[:,1]]
+                    gt_vals = gt_depth[pixel_coords[:,0], pixel_coords[:,1]].astype(np.float32)
+                    logger.info(f"  - pred values at coords: min={pred_vals.min():.4f}, max={pred_vals.max():.4f}, non-zero={np.sum(pred_vals > 0)}")
+                    logger.info(f"  - gt values at coords: min={gt_vals.min():.4f}, max={gt_vals.max():.4f}, non-zero={np.sum(gt_vals > 0)}")
+                    valid_mask = (pred_vals > 0) & (gt_vals > 0)
+                    logger.info(f"  - valid (both > 0): {np.sum(valid_mask)} points")
+
                 alpha, beta = find_scale_and_shift(depth_npy, gt_depth, pixel_coords, mask_invalid=True)
+                logger.info(f"  - calibration result: alpha={alpha:.6f}, beta={beta:.6f}")
 
                 # Apply calibration
                 calibrated_depth = []
