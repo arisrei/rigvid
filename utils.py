@@ -78,8 +78,12 @@ def find_scale_and_shift(
     # Sanity check - if calibration gives bad values, raise
     if not np.isfinite(alpha) or not np.isfinite(beta):
         raise ValueError(f"Depth calibration produced invalid values: alpha={alpha}, beta={beta}")
-    if alpha <= 0:
-        raise ValueError(f"Depth calibration produced non-positive alpha={alpha}. This suggests the depth maps are incompatible.")
+    if alpha == 0:
+        raise ValueError(f"Depth calibration produced zero alpha. This suggests the predicted depth has no variation in the mask region.")
+
+    # Note: negative alpha is valid when the predicted depth uses inverse depth convention
+    # (e.g., RollingDepth outputs disparity-like values where closer = higher, farther = lower)
+    # while metric depth uses the opposite convention (closer = lower, farther = higher)
 
     return alpha, beta
 
